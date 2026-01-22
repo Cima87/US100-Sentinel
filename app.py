@@ -84,7 +84,8 @@ def get_ai_sentiment():
         return headlines, "#555", "API KEY MISSING", "Add GOOGLE_API_KEY in Streamlit Secrets to activate AI."
 
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        # Using the absolute flagship Gemini 3 Pro (Preview)
+model = genai.GenerativeModel('gemini-3-pro-preview')
         prompt = f"""
         Act as a Wall Street algorithm. Analyze these news headlines for NASDAQ-100 Futures:
         {headlines}
