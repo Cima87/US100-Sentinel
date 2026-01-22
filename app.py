@@ -4,6 +4,8 @@ import feedparser
 import time
 import google.generativeai as genai
 import hashlib
+from datetime import datetime
+import pytz # Timezone tool
 
 # ==========================================
 # 🔑 CONFIGURATION
@@ -11,8 +13,7 @@ import hashlib
 try:
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=GOOGLE_API_KEY)
-    
-    # 🚀 USING THE FLAGSHIP GEMINI 3 PRO (TIER 1)
+    # Using Flagship Gemini 3 Pro (Tier 1)
     model = genai.GenerativeModel('gemini-3-pro-preview') 
     AI_AVAILABLE = True
 except:
@@ -22,11 +23,10 @@ except:
 # 🧠 MEMORY (Session State)
 # ==========================================
 if 'last_run' not in st.session_state: st.session_state.last_run = 0
-if 'cached_ai_summary' not in st.session_state: st.session_state.cached_ai_summary = "Initializing Intelligence..."
+if 'cached_ai_summary' not in st.session_state: st.session_state.cached_ai_summary = "MARKET CLOSED. AI SLEEPING."
 if 'cached_ai_color' not in st.session_state: st.session_state.cached_ai_color = "#333" 
-if 'cached_ai_status' not in st.session_state: st.session_state.cached_ai_status = "STANDBY"
+if 'cached_ai_status' not in st.session_state: st.session_state.cached_ai_status = "OFFLINE"
 if 'cached_breaking' not in st.session_state: st.session_state.cached_breaking = None
-if 'last_news_hash' not in st.session_state: st.session_state.last_news_hash = ""
 
 # ==========================================
 # 🎨 STATIC CSS
@@ -102,21 +102,34 @@ def get_latest_headlines():
         except: pass
     return headlines
 
+def check_market_hours():
+    # STRICT RULE: Mon-Fri, 9:00 AM to 6:00 PM EST
+    tz = pytz.timezone('US/Eastern')
+    now = datetime.now(tz)
+    
+    # 1. Check Weekend (5=Sat, 6=Sun)
+    if now.weekday() > 4: 
+        return False
+        
+    # 2. Check Hours (9 to 17:59)
+    # "18" means 6:00 PM, so we stop exactly when it hits 18.
+    if 9 <= now.hour < 18:
+        return True
+        
+    return False
+
 def run_gemini_analysis(headlines_text):
     if not AI_AVAILABLE:
         return "#555", "API ERROR", "Key Missing", None
 
     try:
-        # ==========================================
-        # 🤖 YOUR CUSTOM PROMPT
-        # ==========================================
         prompt = f"""
-        Act as a Senior Wall Street Futures Trader. Analyze these headlines and the articles for NASDAQ-100 (US100) impact:
+        Act as a Senior Wall Street Futures Trader. Analyze these headlines for NASDAQ-100 (US100) impact:
         {headlines_text}
         
         Task:
         1. Determine Sentiment (GREEN=Bullish, RED=Bearish, ORANGE=Mixed).
-        2. Write a Situation Report (4-5 sentences max).Explain WHY the market is moving (e.g., connect specific earnings or data to the price action). Focus mainly on the US100. It is important to get an analogy of the highest grade. Therefore concider and read all those news and gain other knowledge related to the stock market that could affect the US100. Audit your conclution twice before sending it. Keep your wording casual within the average english speaker vocabulary.  
+        2. Write a Situation Report (Max 30 words). Identify the specific catalyst driving liquidity.
         3. CHECK FOR BREAKING 3-STAR EVENTS (War, Rate Hike, Crash). 
            - If found, extract the event name.
            - If NOT found, write "NONE".
@@ -145,7 +158,7 @@ def run_gemini_analysis(headlines_text):
         return "#FFA500", "AI ERROR", f"Offline: {str(e)}", None
 
 # ==========================================
-# 🔄 UI RENDERING (Optimistic UI)
+# 🔄 MAIN LOOP (Orchestrator)
 # ==========================================
 
 @st.fragment(run_every=60)
@@ -157,7 +170,7 @@ def main_dashboard_loop():
     ai_ph = st.empty()
     news_ph = st.empty()
     
-    # 2. RENDER CACHED DATA (Instant - No Black Screen)
+    # 2. RENDER CACHED DATA (Instant)
     with traffic_ph.container():
         st.markdown(f"""
         <div class="traffic-container">
@@ -167,7 +180,7 @@ def main_dashboard_loop():
         """, unsafe_allow_html=True)
 
     with ai_ph.container():
-        st.markdown('<div class="label">GEMINI 3 SITUATION REPORT</div>', unsafe_allow_html=True)
+        st.markdown('<div class="label">GEMINI SITUATION REPORT</div>', unsafe_allow_html=True)
         st.markdown(f"""
         <div class="ai-box" style="border-left-color: {st.session_state.cached_ai_color};">
             <div class="ai-text">{st.session_state.cached_ai_summary}</div>
@@ -179,7 +192,7 @@ def main_dashboard_loop():
     else:
         breaking_ph.markdown('<div style="height: 20px;"></div>', unsafe_allow_html=True)
 
-    # 3. UPDATE FAST DATA
+    # 3. FAST UPDATES (Price & News Feed - Always Active)
     price, change, pct, sek = get_market_data()
     news_items = get_latest_headlines()
     
@@ -205,23 +218,33 @@ def main_dashboard_loop():
         for item in news_items:
             st.markdown(f'<div class="news-item"><a href="{item["link"]}" target="_blank">{item["title"]}</a></div>', unsafe_allow_html=True)
 
-    # 4. RUN AI (Background)
+    # 4. CONDITIONAL AI RUN (Strict Schedule)
     current_time = time.time()
-    news_text = str([h['title'] for h in news_items])
-    news_hash = hashlib.md5(news_text.encode()).hexdigest()
     
-    if (current_time - st.session_state.last_run) > 300 or (news_hash != st.session_state.last_news_hash):
+    # Rule 1: Is the Market Open? (9am-6pm EST, Mon-Fri)
+    is_market_open = check_market_hours()
+    
+    # Rule 2: Has it been 30 mins since last run?
+    # 1800 seconds = 30 minutes
+    is_time_up = (current_time - st.session_state.last_run) > 1800 
+    
+    # Rule 3: Is this the first boot during market hours?
+    is_fresh_start = (st.session_state.last_run == 0)
+
+    # EXECUTE IF: (Market Open AND Time Up) OR (Market Open AND First Run)
+    if (is_market_open and is_time_up) or (is_market_open and is_fresh_start):
+        
+        news_text = str([h['title'] for h in news_items])
         color, status, summary, breaking = run_gemini_analysis(news_text)
         
-        # Update Memory
+        # Save to Memory
         st.session_state.cached_ai_color = color
         st.session_state.cached_ai_status = status
         st.session_state.cached_ai_summary = summary
         st.session_state.cached_breaking = breaking
         st.session_state.last_run = current_time
-        st.session_state.last_news_hash = news_hash
         
-        # Redraw AI components ONLY
+        # Redraw AI Parts
         with traffic_ph.container():
             st.markdown(f"""
             <div class="traffic-container">
@@ -231,7 +254,7 @@ def main_dashboard_loop():
             """, unsafe_allow_html=True)
             
         with ai_ph.container():
-            st.markdown('<div class="label">GEMINI 3 SITUATION REPORT</div>', unsafe_allow_html=True)
+            st.markdown('<div class="label">GEMINI SITUATION REPORT</div>', unsafe_allow_html=True)
             st.markdown(f"""
             <div class="ai-box" style="border-left-color: {color};">
                 <div class="ai-text">{summary}</div>
