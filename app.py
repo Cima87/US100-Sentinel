@@ -40,39 +40,40 @@ st.markdown("""
     .stApp { background-color: #000000; color: #FFFFFF; font-family: 'Montserrat', sans-serif; }
     header, footer {visibility: hidden;}
     
-    /* 1. SLICK HEADER */
+    /* 1. SLICK HEADER (Updated: Solid White & Bigger) */
     .vortex-header {
         text-align: center;
         font-size: 10px;
         letter-spacing: 4px;
         color: #666;
         margin-top: -30px;
-        margin-bottom: 5px;
+        margin-bottom: 0px;
         text-transform: uppercase;
     }
     .vortex-title {
         text-align: center;
-        font-size: 32px;
-        font-weight: 800;
-        background: -webkit-linear-gradient(#eee, #333);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 20px;
+        font-size: 42px;  /* Bigger */
+        font-weight: 700; /* Bold but clean */
+        color: #FFFFFF;   /* Solid White */
+        margin-bottom: 15px;
         letter-spacing: -1px;
     }
 
-    /* 2. THE HERO PRICE (US100) */
+    /* 2. THE HERO PRICE (Updated: Smaller & Tighter) */
     .hero-container {
         text-align: center;
-        margin-bottom: 30px;
-        padding: 20px;
+        margin-bottom: 25px;
+        padding: 12px; /* Less padding */
         background: radial-gradient(circle at center, #111 0%, #000 70%);
         border: 1px solid #222;
-        border-radius: 12px;
+        border-radius: 10px;
+        width: 60%; /* Limit width to make it look smaller */
+        margin-left: auto;
+        margin-right: auto;
     }
-    .hero-label { font-size: 12px; color: #888; letter-spacing: 2px; margin-bottom: 5px; }
-    .hero-price { font-size: 42px; font-weight: 800; color: #FFF; line-height: 1; }
-    .hero-change { font-size: 16px; font-weight: 600; margin-top: 5px; }
+    .hero-label { font-size: 10px; color: #888; letter-spacing: 2px; margin-bottom: 2px; }
+    .hero-price { font-size: 32px; font-weight: 700; color: #FFF; line-height: 1.1; } /* Smaller font */
+    .hero-change { font-size: 14px; font-weight: 600; margin-top: 2px; }
     
     /* 3. TRAFFIC LIGHT (Investment Climate) */
     .traffic-container { display: flex; flex-direction: column; align-items: center; margin-bottom: 25px; }
@@ -169,7 +170,9 @@ def run_gemini_analysis(headlines_text, is_end_of_day=False):
             # End of Day Prompt
             prompt = f"Act as a Senior Wall Street Analyst. Market Closed. Analyze these headlines: {headlines_text}. Task: 1. Daily Wrap-Up (Max 3 sentences). 2. End with 'Markets closed. AI is sleeping now.' 3. Color #333. Output: COLOR|SUMMARY|NONE"
         else:
-            # AUDITED TRADING PROMPT
+            # ==========================================
+            # 🤖 UPDATED PROMPT (The 3-Factor Logic)
+            # ==========================================
             prompt = f"""
             Act as a Senior NASDAQ Futures Trader. Analyze these headlines: {headlines_text}
             
@@ -179,8 +182,9 @@ def run_gemini_analysis(headlines_text, is_end_of_day=False):
             - ORANGE (#FFA500) = NEUTRAL or CHOPPY.
             *CRITICAL: Do not mark 'Volatility' as Red unless it is Downside Volatility.*
             
-            Task 2: Situation Report (Max 30 words):
+            Task 2: Situation Report (Max 60 words):
             - Identify the single biggest catalyst moving the NQ futures right now.
+            - Also mention two other factors that play a role in the movement of the NQ futures right now.
             
             Task 3: Check for BREAKING 3-STAR EVENTS (Crash, War, Fed Decision). 
             - If found, output event name. Else "NONE".
