@@ -6,6 +6,7 @@ import google.generativeai as genai
 import hashlib
 from datetime import datetime
 import pytz
+import plotly.graph_objects as go # New Charting Tool
 
 # ==========================================
 # 🔑 CONFIGURATION
@@ -22,13 +23,17 @@ except:
 # 🧠 MEMORY
 # ==========================================
 if 'last_run' not in st.session_state: st.session_state.last_run = 0
-if 'cached_ai_summary' not in st.session_state: st.session_state.cached_ai_summary = "Initializing System..."
+# CHANGED: Better default message so you know why it's quiet
+if 'cached_ai_summary' not in st.session_state: st.session_state.cached_ai_summary = "System Standby. Waiting for US Market Open (09:00 EST)..."
 if 'cached_ai_color' not in st.session_state: st.session_state.cached_ai_color = "#333" 
-if 'cached_ai_status' not in st.session_state: st.session_state.cached_ai_status = "STANDBY"
+if 'cached_ai_status' not in st.session_state: st.session_state.cached_ai_status = "OFFLINE"
 if 'cached_breaking' not in st.session_state: st.session_state.cached_breaking = None
 
+# Chart State
+if 'chart_period' not in st.session_state: st.session_state.chart_period = "1d"
+
 # ==========================================
-# 🎨 SHARED CSS (Vortex Theme)
+# 🎨 CSS
 # ==========================================
 st.set_page_config(page_title="US100 VORTEX", layout="centered")
 
@@ -39,14 +44,13 @@ st.markdown("""
     .stApp { background-color: #000000; color: #FFFFFF; font-family: 'Montserrat', sans-serif; }
     header, footer {visibility: hidden;}
     
-    /* DASHBOARD STYLES */
+    /* DASHBOARD */
     .vortex-header { text-align: center; font-size: 10px; letter-spacing: 4px; color: #666; margin-top: -30px; text-transform: uppercase; }
     .vortex-title { text-align: center; font-size: 42px; font-weight: 700; color: #FFFFFF; margin-bottom: 15px; letter-spacing: -1px; }
 
-    /* CLICKABLE HERO CONTAINER */
+    /* HERO LINK */
     .hero-link { text-decoration: none; display: block; transition: transform 0.1s; }
     .hero-link:hover { transform: scale(1.02); }
-    
     .hero-container {
         text-align: center; margin-bottom: 25px; padding: 12px;
         background: radial-gradient(circle at center, #111 0%, #000 70%);
@@ -57,12 +61,11 @@ st.markdown("""
     .hero-price { font-size: 32px; font-weight: 700; color: #FFF; line-height: 1.1; }
     .hero-change { font-size: 14px; font-weight: 600; margin-top: 2px; }
 
-    /* TRAFFIC LIGHT */
+    /* COMPONENTS */
     .traffic-container { display: flex; flex-direction: column; align-items: center; margin-bottom: 25px; }
-    .traffic-light { width: 100px; height: 100px; border-radius: 50%; margin-bottom: 15px; transition: background-color 0.5s ease; border: 4px solid #111; }
+    .traffic-light { width: 100px; height: 100px; border-radius: 50%; margin-bottom: 15px; border: 4px solid #111; }
     .status-text { font-size: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; }
 
-    /* GLOBAL GRID */
     .global-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 25px; background: #080808; padding: 8px; border-radius: 8px; border: 1px solid #222; }
     .global-item { text-align: center; padding: 5px 0; border-right: 1px solid #222; }
     .global-item:last-child { border-right: none; }
@@ -70,24 +73,30 @@ st.markdown("""
     .g-price { font-size: 11px; font-weight: 600; color: #DDD; }
     .g-change { font-size: 10px; font-weight: 600; margin-bottom: 2px; }
 
-    /* AI & NEWS */
     .ai-box { margin-bottom: 30px; padding: 15px; border-left: 4px solid #333; background: #080808; }
     .ai-text { font-size: 16px; color: #EEE; line-height: 1.6; font-weight: 400; }
     .breaking-box { background-color: #330000; border: 2px solid #FF0000; color: #FF4444; padding: 15px; text-align: center; font-size: 18px; font-weight: 800; margin-bottom: 30px; border-radius: 5px; text-transform: uppercase; animation: pulse 2s infinite; }
     @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+    
     .news-header { font-size: 12px; color: #666; letter-spacing: 1px; text-transform: uppercase; border-bottom: 1px solid #222; padding-bottom: 8px; margin-bottom: 15px;}
     .news-item { margin-bottom: 14px; font-size: 14px; border-left: 2px solid #333; padding-left: 12px; }
     .news-item a { color: #CCC; text-decoration: none; }
     .news-item a:hover { color: #4da6ff; }
-    
-    /* CHART PAGE STYLES */
-    .back-btn { font-size: 12px; color: #888; text-decoration: none; margin-bottom: 20px; display: inline-block; border: 1px solid #333; padding: 5px 10px; border-radius: 5px; }
-    .back-btn:hover { background: #222; color: #FFF; }
+
+    /* CHART PAGE */
+    .back-btn { font-size: 12px; color: #888; text-decoration: none; border: 1px solid #333; padding: 8px 15px; border-radius: 5px; background: #111; }
+    .chart-btn-group { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+    /* Streamlit Button Override to make them small and sleek */
+    .stButton > button {
+        background-color: #111; color: white; border: 1px solid #333; font-size: 12px; padding: 5px 15px;
+    }
+    .stButton > button:hover { border-color: #666; color: #FFF; }
+    .stButton > button:focus { border-color: #FFF; color: #FFF; }
     </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 🧠 HELPER FUNCTIONS
+# 🧠 FUNCTIONS
 # ==========================================
 def get_current_est_time():
     tz = pytz.timezone('US/Eastern')
@@ -154,60 +163,89 @@ def run_gemini_analysis(headlines_text, is_end_of_day=False):
     except Exception as e: return "#FFA500", "AI ERROR", f"Offline: {str(e)}", None
 
 # ==========================================
-# 📊 VIEW 1: THE CHART PAGE
+# 📊 VIEW 1: THE CHART PAGE (Redesigned)
 # ==========================================
 def show_chart_page():
-    # Back Button (Just a link to the main view)
-    st.markdown('<a href="?view=dashboard" target="_self" class="back-btn">← BACK TO DASHBOARD</a>', unsafe_allow_html=True)
-    
-    st.markdown('<div class="vortex-title" style="font-size: 28px;">US100 PERFORMANCE</div>', unsafe_allow_html=True)
-    
-    # Timeframe Selector
-    # Using columns to center the selector nicely
-    col1, col2, col3 = st.columns([1, 2, 1])
+    # 1. Header with Back Button
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        st.markdown('<br><a href="?view=dashboard" target="_self" class="back-btn">← BACK</a>', unsafe_allow_html=True)
     with col2:
-        period = st.select_slider("Select Timeframe", options=["1D", "5D", "1M", "3M", "6M", "1Y", "MAX"], value="1M")
-
-    # Map selection to yfinance args
-    yf_period = "1mo"
-    yf_interval = "1d"
+        st.markdown('<div class="vortex-title" style="text-align: right; font-size: 24px;">US100 PERFORMANCE</div>', unsafe_allow_html=True)
     
-    if period == "1D": yf_period, yf_interval = "1d", "5m"
-    elif period == "5D": yf_period, yf_interval = "5d", "15m"
-    elif period == "1M": yf_period, yf_interval = "1mo", "1d"
-    elif period == "3M": yf_period, yf_interval = "3mo", "1d"
-    elif period == "6M": yf_period, yf_interval = "6mo", "1d"
-    elif period == "1Y": yf_period, yf_interval = "1y", "1d"
-    elif period == "MAX": yf_period, yf_interval = "max", "1wk"
+    st.markdown("---")
 
-    # Fetch Data
-    with st.spinner("Loading Chart..."):
-        try:
-            ticker = yf.Ticker("NQ=F")
-            hist = ticker.history(period=yf_period, interval=yf_interval)
+    # 2. Determine Data Request based on Button State
+    p_map = {"1d": ("1d", "5m"), "7d": ("5d", "15m"), "1mo": ("1mo", "60m"), "1y": ("1y", "1d")}
+    yf_period, yf_interval = p_map.get(st.session_state.chart_period, ("1d", "5m"))
+
+    # 3. Fetch Data
+    try:
+        ticker = yf.Ticker("NQ=F")
+        hist = ticker.history(period=yf_period, interval=yf_interval)
+        
+        if not hist.empty:
+            # 4. Create Custom Black Chart (Plotly)
+            fig = go.Figure()
             
-            if not hist.empty:
-                # Color logic: Green if Up, Red if Down over the period
-                start_p = hist['Close'].iloc[0]
-                end_p = hist['Close'].iloc[-1]
-                chart_color = "#00FF00" if end_p >= start_p else "#FF4444"
-                
-                # Display current stats
-                change = end_p - start_p
-                pct = (change / start_p) * 100
-                st.markdown(f"""
-                <div style="text-align: center; margin-bottom: 20px;">
-                    <span style="font-size: 32px; font-weight: 700;">{end_p:,.2f}</span>
-                    <span style="font-size: 18px; color: {chart_color}; margin-left: 10px;">{change:+.2f} ({pct:+.2f}%)</span>
-                </div>
-                """, unsafe_allow_html=True)
+            # Add Line (White)
+            fig.add_trace(go.Scatter(
+                x=hist.index, 
+                y=hist['Close'], 
+                mode='lines', 
+                line=dict(color='white', width=2),
+                fill='tozeroy', # Optional: faint fill
+                fillcolor='rgba(255, 255, 255, 0.1)' 
+            ))
 
-                # Render Chart
-                st.area_chart(hist['Close'], color=chart_color, use_container_width=True)
-            else:
-                st.warning("No data available for this timeframe.")
-        except:
-            st.error("Error loading chart data.")
+            # Styling the Black Box
+            fig.update_layout(
+                paper_bgcolor='black',
+                plot_bgcolor='black',
+                margin=dict(l=10, r=10, t=10, b=10),
+                height=400,
+                xaxis=dict(
+                    showgrid=False, 
+                    color='#666', 
+                    gridcolor='#222'
+                ),
+                yaxis=dict(
+                    showgrid=True, 
+                    color='#666', 
+                    gridcolor='#222',
+                    side='right' # Price on right is standard for trading
+                )
+            )
+            
+            # Render the Chart
+            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            
+        else:
+            st.warning("Chart data unavailable.")
+    except:
+        st.error("Connection Error.")
+
+    # 5. Bottom Right Buttons
+    # Use columns to push buttons to the right
+    c1, c2, c3, c4, c5 = st.columns([6, 1, 1, 1, 1])
+    
+    # Logic: If button clicked, update state and rerun
+    with c2:
+        if st.button("24h"): 
+            st.session_state.chart_period = "1d"
+            st.rerun()
+    with c3:
+        if st.button("7d"): 
+            st.session_state.chart_period = "7d"
+            st.rerun()
+    with c4:
+        if st.button("1M"): 
+            st.session_state.chart_period = "1mo"
+            st.rerun()
+    with c5:
+        if st.button("1Y"): 
+            st.session_state.chart_period = "1y"
+            st.rerun()
 
 # ==========================================
 # 🏠 VIEW 2: THE DASHBOARD (Main Loop)
@@ -296,9 +334,8 @@ def main_dashboard_loop():
         st.rerun()
 
 # ==========================================
-# 🚦 ROUTER (THE SWITCH)
+# 🚦 ROUTER
 # ==========================================
-# This reads the URL (?view=chart) and decides which function to run
 params = st.query_params
 if params.get("view") == "chart":
     show_chart_page()
