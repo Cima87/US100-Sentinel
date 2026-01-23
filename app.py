@@ -23,14 +23,14 @@ except:
 # 🧠 MEMORY
 # ==========================================
 if 'last_run' not in st.session_state: st.session_state.last_run = 0
-if 'cached_ai_summary' not in st.session_state: st.session_state.cached_ai_summary = "System Standby. Waiting for US Market Open (09:00 EST)..."
+if 'cached_ai_summary' not in st.session_state: st.session_state.cached_ai_summary = "System Standby. Waiting for US Market Open..."
 if 'cached_ai_color' not in st.session_state: st.session_state.cached_ai_color = "#333" 
 if 'cached_ai_status' not in st.session_state: st.session_state.cached_ai_status = "OFFLINE"
 if 'cached_breaking' not in st.session_state: st.session_state.cached_breaking = None
 if 'chart_period' not in st.session_state: st.session_state.chart_period = "1d"
 
 # ==========================================
-# 🎨 CSS (FINAL POLISH)
+# 🎨 CSS (ANTI-FLICKER & COMPACT)
 # ==========================================
 st.set_page_config(page_title="US100 VORTEX", layout="centered")
 
@@ -41,53 +41,38 @@ st.markdown("""
     .stApp { background-color: #000000; color: #FFFFFF; font-family: 'Montserrat', sans-serif; }
     header, footer {visibility: hidden;}
     
-    /* 1. HEADER (Title on Top, Subhead Below) */
+    /* 1. REMOVE TOP SPACING */
+    .block-container { padding-top: 1rem; padding-bottom: 2rem; }
+
+    /* 2. HEADER */
     .vortex-title {
-        text-align: center;
-        font-size: 38px;
-        font-weight: 800;
-        color: #FFFFFF;
-        margin-top: -30px;
-        margin-bottom: 0px; /* Tucked close to subhead */
-        letter-spacing: -1px;
-        line-height: 1;
+        text-align: center; font-size: 38px; font-weight: 800; color: #FFFFFF;
+        margin-bottom: 0px; letter-spacing: -1px; line-height: 1;
     }
     .vortex-header {
-        text-align: center;
-        font-size: 9px;
-        letter-spacing: 3px;
-        color: #666;
-        margin-top: 5px;
-        margin-bottom: 25px;
-        text-transform: uppercase;
-        font-weight: 600;
+        text-align: center; font-size: 9px; letter-spacing: 3px; color: #666;
+        margin-top: 5px; margin-bottom: 20px; text-transform: uppercase; font-weight: 600;
     }
 
-    /* 2. COMPACT HERO CONTAINER */
+    /* 3. COMPACT HERO (Smaller) */
     .hero-link { text-decoration: none; display: block; transition: transform 0.1s; }
     .hero-link:hover { transform: scale(1.02); }
-    
     .hero-container {
-        text-align: center; 
-        margin-bottom: 20px; 
-        padding: 8px 15px; /* Tighter padding */
+        text-align: center; margin-bottom: 20px; padding: 6px 12px;
         background: radial-gradient(circle at center, #111 0%, #000 80%);
-        border: 1px solid #222; 
-        border-radius: 8px;
-        width: 220px; /* Fixed compact width */
-        margin-left: auto; 
-        margin-right: auto;
+        border: 1px solid #222; border-radius: 8px;
+        width: 180px; /* Narrower */
+        margin-left: auto; margin-right: auto;
     }
-    .hero-label { font-size: 9px; color: #777; letter-spacing: 1px; margin-bottom: 2px; }
-    .hero-price { font-size: 24px; font-weight: 700; color: #FFF; line-height: 1; } /* Smaller Font */
-    .hero-change { font-size: 12px; font-weight: 600; margin-top: 3px; }
+    .hero-label { font-size: 8px; color: #777; letter-spacing: 1px; margin-bottom: 1px; }
+    .hero-price { font-size: 20px; font-weight: 700; color: #FFF; line-height: 1; } /* Smaller font */
+    .hero-change { font-size: 11px; font-weight: 600; margin-top: 2px; }
 
-    /* TRAFFIC LIGHT */
+    /* COMPONENTS */
     .traffic-container { display: flex; flex-direction: column; align-items: center; margin-bottom: 25px; }
     .traffic-light { width: 100px; height: 100px; border-radius: 50%; margin-bottom: 15px; border: 4px solid #111; transition: all 0.5s ease; }
     .status-text { font-size: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; }
 
-    /* GLOBAL GRID */
     .global-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 25px; background: #080808; padding: 8px; border-radius: 8px; border: 1px solid #222; }
     .global-item { text-align: center; padding: 5px 0; border-right: 1px solid #222; }
     .global-item:last-child { border-right: none; }
@@ -95,6 +80,14 @@ st.markdown("""
     .g-price { font-size: 11px; font-weight: 600; color: #DDD; }
     .g-change { font-size: 10px; font-weight: 600; margin-bottom: 2px; }
 
+    /* NEWS FLASH BUTTON */
+    .stButton > button {
+        background-color: #222; color: #CCC; border: 1px solid #444; 
+        font-size: 10px; padding: 4px 10px; text-transform: uppercase;
+        margin-top: -5px; /* Align with header */
+    }
+    .stButton > button:hover { border-color: #FFF; color: #FFF; background: #333; }
+    
     /* AI & NEWS */
     .ai-box { margin-bottom: 30px; padding: 15px; border-left: 4px solid #333; background: #080808; }
     .ai-text { font-size: 16px; color: #EEE; line-height: 1.6; font-weight: 400; }
@@ -105,10 +98,9 @@ st.markdown("""
     .news-item { margin-bottom: 14px; font-size: 14px; border-left: 2px solid #333; padding-left: 12px; }
     .news-item a { color: #CCC; text-decoration: none; }
     .news-item a:hover { color: #4da6ff; }
-
-    /* CHART PAGE */
+    
+    /* CHART BACK BUTTON */
     .back-btn { font-size: 12px; color: #888; text-decoration: none; border: 1px solid #333; padding: 8px 15px; border-radius: 5px; background: #111; }
-    .stButton > button { background-color: #111; color: white; border: 1px solid #333; font-size: 12px; padding: 5px 15px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -185,10 +177,8 @@ def show_chart_page():
     col1, col2 = st.columns([1, 4])
     with col1: st.markdown('<br><a href="?view=dashboard" target="_self" class="back-btn">← BACK</a>', unsafe_allow_html=True)
     with col2: st.markdown('<div class="vortex-title" style="text-align: right; font-size: 24px; margin-top: 10px;">US100 CHART</div>', unsafe_allow_html=True)
-    
     st.markdown("---")
     
-    # 4 Buttons row
     c1, c2, c3, c4 = st.columns(4)
     with c1: 
         if st.button("24H"): st.session_state.chart_period = "1d"; st.rerun()
@@ -214,17 +204,20 @@ def show_chart_page():
     except: st.error("Chart Error")
 
 # ==========================================
-# 🏠 VIEW 2: DASHBOARD
+# 🏠 VIEW 2: DASHBOARD (NO FLICKER)
 # ==========================================
 @st.fragment(run_every=60)
 def main_dashboard_loop():
+    # 1. Placeholders
     header_ph = st.empty()
     traffic_ph = st.empty()
     global_ph = st.empty()
     breaking_ph = st.empty()
+    ai_header_ph = st.empty() # For Header + Button
     ai_ph = st.empty()
     news_ph = st.empty()
     
+    # 2. Get Data
     data = get_financial_data()
     news_items = get_latest_headlines()
     
@@ -232,12 +225,10 @@ def main_dashboard_loop():
     hero_color = "#00FF00" if nq_c >= 0 else "#FF4444"
     hero_sign = "+" if nq_c >= 0 else ""
     
-    # 1. NEW HEADER LAYOUT
+    # 3. RENDER UI
     with header_ph.container():
         st.markdown('<div class="vortex-title">US100 VORTEX</div>', unsafe_allow_html=True)
         st.markdown('<div class="vortex-header">ALGORITHMIC NEWS FILTER</div>', unsafe_allow_html=True)
-        
-        # Compact Hero
         st.markdown(f"""
         <a href="?view=chart" target="_self" class="hero-link">
             <div class="hero-container">
@@ -259,8 +250,21 @@ def main_dashboard_loop():
     with global_ph.container():
         st.markdown(f'<div class="global-grid">{fmt_item("🇪🇺 DAX", "DAX")}{fmt_item("🇬🇧 FTSE", "FTSE")}{fmt_item("🇯🇵 NIKKEI", "NI225")}{fmt_item("🇺🇸 DXY", "DXY")}</div>', unsafe_allow_html=True)
 
+    # --- BUTTON LOGIC ---
+    # Check if we should show the manual trigger
+    show_flash_btn = st.session_state.cached_ai_status in ["OFFLINE", "STANDBY", "MARKET CLOSED"]
+    manual_trigger = False
+
+    with ai_header_ph.container():
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            st.markdown('<div class="label" style="margin-top:5px;">GEMINI SITUATION REPORT</div>', unsafe_allow_html=True)
+        with c2:
+            if show_flash_btn:
+                if st.button("⚡ NEWS FLASH"):
+                    manual_trigger = True
+
     with ai_ph.container():
-        st.markdown('<div class="label">GEMINI SITUATION REPORT</div>', unsafe_allow_html=True)
         st.markdown(f'<div class="ai-box" style="border-left-color: {st.session_state.cached_ai_color};"><div class="ai-text">{st.session_state.cached_ai_summary}</div></div>', unsafe_allow_html=True)
 
     if st.session_state.cached_breaking:
@@ -271,27 +275,44 @@ def main_dashboard_loop():
         for item in news_items:
             st.markdown(f'<div class="news-item"><a href="{item["link"]}" target="_blank">{item["title"]}</a></div>', unsafe_allow_html=True)
 
-    # Time Logic
+    # 4. EXECUTION LOGIC (NO FLICKER)
+    # Check Time
     now = get_current_est_time()
     current_time_ts = time.time()
     is_weekday = now.weekday() <= 4
     is_trading_hours = 9 <= now.hour < 18
     is_closing_time = now.hour == 18
+    
+    # Auto triggers
     should_run_standard = is_weekday and is_trading_hours and ((current_time_ts - st.session_state.last_run) > 1800)
     last_run_hour = datetime.fromtimestamp(st.session_state.last_run, pytz.timezone('US/Eastern')).hour
     should_run_closing = is_weekday and is_closing_time and (last_run_hour < 18)
     should_run_fresh = (st.session_state.last_run == 0) and (is_trading_hours or is_closing_time)
 
-    if should_run_standard or should_run_closing or should_run_fresh:
+    # Run if Auto Condition OR Manual Button Clicked
+    if should_run_standard or should_run_closing or should_run_fresh or manual_trigger:
         news_text = str([h['title'] for h in news_items])
         is_eod_run = should_run_closing or (is_closing_time and should_run_fresh)
+        
+        # Run AI
         color, status, summary, breaking = run_gemini_analysis(news_text, is_end_of_day=is_eod_run)
+        
+        # Update Session State
         st.session_state.cached_ai_color = color
         st.session_state.cached_ai_status = status
         st.session_state.cached_ai_summary = summary
         st.session_state.cached_breaking = breaking
         st.session_state.last_run = current_time_ts
-        st.rerun()
+        
+        # Force Immediate UI Update (Overwrite Placeholders) without Page Reload
+        with traffic_ph.container():
+            st.markdown(f'<div class="traffic-container"><div class="traffic-light" style="background-color: {color}; box-shadow: 0 0 80px {color};"></div><div class="status-text" style="color: {color};">{status}</div></div>', unsafe_allow_html=True)
+        
+        with ai_ph.container():
+             st.markdown(f'<div class="ai-box" style="border-left-color: {color};"><div class="ai-text">{summary}</div></div>', unsafe_allow_html=True)
+
+        # Note: We do NOT call st.rerun() here. This prevents the flicker. 
+        # The placeholders update instantly, and the fragment will naturally cycle again in 60s.
 
 # ==========================================
 # 🚦 ROUTER
