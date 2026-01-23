@@ -161,12 +161,13 @@ def run_gemini_analysis(headlines_text, previous_summary, is_end_of_day=False):
             
             TASK:
             Update the situation report. Compare NEW headlines against PREVIOUS context.
-            - If new news contradicts old news (e.g. "Sales Stall" vs "Sales Cleared"), clarify the confusion.
+            - Be a Senior NASDAQ Futures Trader. Identify the single biggest catalyst moving the NQ futures right now. Also mention two other factors that play a role in the movement of the NQ futures right now.
+            - If new news contradicts old news (e.g. "Sales Stall" vs "Sales Cleared"), clarify the confusion, do not guess. Audit your output twice.  
             - Weigh the 'Freshness': New headlines override old ones.
             - Traffic Light: GREEN=Bullish, RED=Bearish, ORANGE=Mixed/Choppy.
             
             OUTPUT RULES:
-            - Summary (Max 60 words): Focus on the primary catalyst.
+            - Summary (Max 100 words): Focus on the primary catalyst.
             - Breaking Event: Only for Crashes/War/Fed. Else "NONE".
             
             Output strictly: COLOR|SUMMARY|BREAKING_EVENT
