@@ -6,7 +6,7 @@ import google.generativeai as genai
 import hashlib
 from datetime import datetime
 import pytz
-import plotly.graph_objects as go # New Charting Tool
+import plotly.graph_objects as go
 
 # ==========================================
 # 🔑 CONFIGURATION
@@ -23,17 +23,14 @@ except:
 # 🧠 MEMORY
 # ==========================================
 if 'last_run' not in st.session_state: st.session_state.last_run = 0
-# CHANGED: Better default message so you know why it's quiet
 if 'cached_ai_summary' not in st.session_state: st.session_state.cached_ai_summary = "System Standby. Waiting for US Market Open (09:00 EST)..."
 if 'cached_ai_color' not in st.session_state: st.session_state.cached_ai_color = "#333" 
 if 'cached_ai_status' not in st.session_state: st.session_state.cached_ai_status = "OFFLINE"
 if 'cached_breaking' not in st.session_state: st.session_state.cached_breaking = None
-
-# Chart State
 if 'chart_period' not in st.session_state: st.session_state.chart_period = "1d"
 
 # ==========================================
-# 🎨 CSS
+# 🎨 CSS (FINAL POLISH)
 # ==========================================
 st.set_page_config(page_title="US100 VORTEX", layout="centered")
 
@@ -44,28 +41,53 @@ st.markdown("""
     .stApp { background-color: #000000; color: #FFFFFF; font-family: 'Montserrat', sans-serif; }
     header, footer {visibility: hidden;}
     
-    /* DASHBOARD */
-    .vortex-header { text-align: center; font-size: 10px; letter-spacing: 4px; color: #666; margin-top: -30px; text-transform: uppercase; }
-    .vortex-title { text-align: center; font-size: 42px; font-weight: 700; color: #FFFFFF; margin-bottom: 15px; letter-spacing: -1px; }
+    /* 1. HEADER (Title on Top, Subhead Below) */
+    .vortex-title {
+        text-align: center;
+        font-size: 38px;
+        font-weight: 800;
+        color: #FFFFFF;
+        margin-top: -30px;
+        margin-bottom: 0px; /* Tucked close to subhead */
+        letter-spacing: -1px;
+        line-height: 1;
+    }
+    .vortex-header {
+        text-align: center;
+        font-size: 9px;
+        letter-spacing: 3px;
+        color: #666;
+        margin-top: 5px;
+        margin-bottom: 25px;
+        text-transform: uppercase;
+        font-weight: 600;
+    }
 
-    /* HERO LINK */
+    /* 2. COMPACT HERO CONTAINER */
     .hero-link { text-decoration: none; display: block; transition: transform 0.1s; }
     .hero-link:hover { transform: scale(1.02); }
+    
     .hero-container {
-        text-align: center; margin-bottom: 25px; padding: 12px;
-        background: radial-gradient(circle at center, #111 0%, #000 70%);
-        border: 1px solid #222; border-radius: 10px;
-        width: 60%; margin-left: auto; margin-right: auto;
+        text-align: center; 
+        margin-bottom: 20px; 
+        padding: 8px 15px; /* Tighter padding */
+        background: radial-gradient(circle at center, #111 0%, #000 80%);
+        border: 1px solid #222; 
+        border-radius: 8px;
+        width: 220px; /* Fixed compact width */
+        margin-left: auto; 
+        margin-right: auto;
     }
-    .hero-label { font-size: 10px; color: #888; letter-spacing: 2px; margin-bottom: 2px; }
-    .hero-price { font-size: 32px; font-weight: 700; color: #FFF; line-height: 1.1; }
-    .hero-change { font-size: 14px; font-weight: 600; margin-top: 2px; }
+    .hero-label { font-size: 9px; color: #777; letter-spacing: 1px; margin-bottom: 2px; }
+    .hero-price { font-size: 24px; font-weight: 700; color: #FFF; line-height: 1; } /* Smaller Font */
+    .hero-change { font-size: 12px; font-weight: 600; margin-top: 3px; }
 
-    /* COMPONENTS */
+    /* TRAFFIC LIGHT */
     .traffic-container { display: flex; flex-direction: column; align-items: center; margin-bottom: 25px; }
-    .traffic-light { width: 100px; height: 100px; border-radius: 50%; margin-bottom: 15px; border: 4px solid #111; }
+    .traffic-light { width: 100px; height: 100px; border-radius: 50%; margin-bottom: 15px; border: 4px solid #111; transition: all 0.5s ease; }
     .status-text { font-size: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; }
 
+    /* GLOBAL GRID */
     .global-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 25px; background: #080808; padding: 8px; border-radius: 8px; border: 1px solid #222; }
     .global-item { text-align: center; padding: 5px 0; border-right: 1px solid #222; }
     .global-item:last-child { border-right: none; }
@@ -73,6 +95,7 @@ st.markdown("""
     .g-price { font-size: 11px; font-weight: 600; color: #DDD; }
     .g-change { font-size: 10px; font-weight: 600; margin-bottom: 2px; }
 
+    /* AI & NEWS */
     .ai-box { margin-bottom: 30px; padding: 15px; border-left: 4px solid #333; background: #080808; }
     .ai-text { font-size: 16px; color: #EEE; line-height: 1.6; font-weight: 400; }
     .breaking-box { background-color: #330000; border: 2px solid #FF0000; color: #FF4444; padding: 15px; text-align: center; font-size: 18px; font-weight: 800; margin-bottom: 30px; border-radius: 5px; text-transform: uppercase; animation: pulse 2s infinite; }
@@ -85,13 +108,7 @@ st.markdown("""
 
     /* CHART PAGE */
     .back-btn { font-size: 12px; color: #888; text-decoration: none; border: 1px solid #333; padding: 8px 15px; border-radius: 5px; background: #111; }
-    .chart-btn-group { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
-    /* Streamlit Button Override to make them small and sleek */
-    .stButton > button {
-        background-color: #111; color: white; border: 1px solid #333; font-size: 12px; padding: 5px 15px;
-    }
-    .stButton > button:hover { border-color: #666; color: #FFF; }
-    .stButton > button:focus { border-color: #FFF; color: #FFF; }
+    .stButton > button { background-color: #111; color: white; border: 1px solid #333; font-size: 12px; padding: 5px 15px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -108,8 +125,7 @@ def get_latest_headlines():
     for url in rss_urls:
         try:
             feed = feedparser.parse(url)
-            for entry in feed.entries[:6]: 
-                headlines.append({"title": entry.title, "link": entry.link})
+            for entry in feed.entries[:6]: headlines.append({"title": entry.title, "link": entry.link})
         except: pass
     return headlines
 
@@ -163,96 +179,45 @@ def run_gemini_analysis(headlines_text, is_end_of_day=False):
     except Exception as e: return "#FFA500", "AI ERROR", f"Offline: {str(e)}", None
 
 # ==========================================
-# 📊 VIEW 1: THE CHART PAGE (Redesigned)
+# 📊 VIEW 1: CHART PAGE
 # ==========================================
 def show_chart_page():
-    # 1. Header with Back Button
     col1, col2 = st.columns([1, 4])
-    with col1:
-        st.markdown('<br><a href="?view=dashboard" target="_self" class="back-btn">← BACK</a>', unsafe_allow_html=True)
-    with col2:
-        st.markdown('<div class="vortex-title" style="text-align: right; font-size: 24px;">US100 PERFORMANCE</div>', unsafe_allow_html=True)
+    with col1: st.markdown('<br><a href="?view=dashboard" target="_self" class="back-btn">← BACK</a>', unsafe_allow_html=True)
+    with col2: st.markdown('<div class="vortex-title" style="text-align: right; font-size: 24px; margin-top: 10px;">US100 CHART</div>', unsafe_allow_html=True)
     
     st.markdown("---")
+    
+    # 4 Buttons row
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: 
+        if st.button("24H"): st.session_state.chart_period = "1d"; st.rerun()
+    with c2: 
+        if st.button("7D"): st.session_state.chart_period = "7d"; st.rerun()
+    with c3: 
+        if st.button("1M"): st.session_state.chart_period = "1mo"; st.rerun()
+    with c4: 
+        if st.button("1Y"): st.session_state.chart_period = "1y"; st.rerun()
 
-    # 2. Determine Data Request based on Button State
     p_map = {"1d": ("1d", "5m"), "7d": ("5d", "15m"), "1mo": ("1mo", "60m"), "1y": ("1y", "1d")}
     yf_period, yf_interval = p_map.get(st.session_state.chart_period, ("1d", "5m"))
 
-    # 3. Fetch Data
     try:
         ticker = yf.Ticker("NQ=F")
         hist = ticker.history(period=yf_period, interval=yf_interval)
-        
         if not hist.empty:
-            # 4. Create Custom Black Chart (Plotly)
             fig = go.Figure()
-            
-            # Add Line (White)
-            fig.add_trace(go.Scatter(
-                x=hist.index, 
-                y=hist['Close'], 
-                mode='lines', 
-                line=dict(color='white', width=2),
-                fill='tozeroy', # Optional: faint fill
-                fillcolor='rgba(255, 255, 255, 0.1)' 
-            ))
-
-            # Styling the Black Box
-            fig.update_layout(
-                paper_bgcolor='black',
-                plot_bgcolor='black',
-                margin=dict(l=10, r=10, t=10, b=10),
-                height=400,
-                xaxis=dict(
-                    showgrid=False, 
-                    color='#666', 
-                    gridcolor='#222'
-                ),
-                yaxis=dict(
-                    showgrid=True, 
-                    color='#666', 
-                    gridcolor='#222',
-                    side='right' # Price on right is standard for trading
-                )
-            )
-            
-            # Render the Chart
+            fig.add_trace(go.Scatter(x=hist.index, y=hist['Close'], mode='lines', line=dict(color='white', width=1.5), fill='tozeroy', fillcolor='rgba(255,255,255,0.05)'))
+            fig.update_layout(paper_bgcolor='black', plot_bgcolor='black', margin=dict(l=0, r=0, t=20, b=0), height=350, xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor='#222', side='right'))
             st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-            
-        else:
-            st.warning("Chart data unavailable.")
-    except:
-        st.error("Connection Error.")
-
-    # 5. Bottom Right Buttons
-    # Use columns to push buttons to the right
-    c1, c2, c3, c4, c5 = st.columns([6, 1, 1, 1, 1])
-    
-    # Logic: If button clicked, update state and rerun
-    with c2:
-        if st.button("24h"): 
-            st.session_state.chart_period = "1d"
-            st.rerun()
-    with c3:
-        if st.button("7d"): 
-            st.session_state.chart_period = "7d"
-            st.rerun()
-    with c4:
-        if st.button("1M"): 
-            st.session_state.chart_period = "1mo"
-            st.rerun()
-    with c5:
-        if st.button("1Y"): 
-            st.session_state.chart_period = "1y"
-            st.rerun()
+        else: st.warning("Data Loading...")
+    except: st.error("Chart Error")
 
 # ==========================================
-# 🏠 VIEW 2: THE DASHBOARD (Main Loop)
+# 🏠 VIEW 2: DASHBOARD
 # ==========================================
 @st.fragment(run_every=60)
 def main_dashboard_loop():
-    # Placeholders
     header_ph = st.empty()
     traffic_ph = st.empty()
     global_ph = st.empty()
@@ -260,7 +225,6 @@ def main_dashboard_loop():
     ai_ph = st.empty()
     news_ph = st.empty()
     
-    # Logic
     data = get_financial_data()
     news_items = get_latest_headlines()
     
@@ -268,28 +232,24 @@ def main_dashboard_loop():
     hero_color = "#00FF00" if nq_c >= 0 else "#FF4444"
     hero_sign = "+" if nq_c >= 0 else ""
     
-    # RENDER HEADER (Now with Link!)
+    # 1. NEW HEADER LAYOUT
     with header_ph.container():
-        st.markdown('<div class="vortex-header">ALGORITHMIC NEWS FILTER</div>', unsafe_allow_html=True)
         st.markdown('<div class="vortex-title">US100 VORTEX</div>', unsafe_allow_html=True)
-        # The Link Wrapper: ?view=chart triggers the page switch
+        st.markdown('<div class="vortex-header">ALGORITHMIC NEWS FILTER</div>', unsafe_allow_html=True)
+        
+        # Compact Hero
         st.markdown(f"""
         <a href="?view=chart" target="_self" class="hero-link">
             <div class="hero-container">
-                <div class="hero-label">NASDAQ 100 FUTURES (CLICK FOR CHART)</div>
-                <div class="hero-price" style="color: {hero_color}; text-shadow: 0 0 20px {hero_color}44;">{nq_p:,.2f}</div>
+                <div class="hero-label">US100 FUTURES</div>
+                <div class="hero-price" style="color: {hero_color}; text-shadow: 0 0 15px {hero_color}33;">{nq_p:,.2f}</div>
                 <div class="hero-change" style="color: {hero_color};">{hero_sign}{nq_c:.2f}%</div>
             </div>
         </a>
         """, unsafe_allow_html=True)
 
     with traffic_ph.container():
-        st.markdown(f"""
-        <div class="traffic-container">
-            <div class="traffic-light" style="background-color: {st.session_state.cached_ai_color}; box-shadow: 0 0 80px {st.session_state.cached_ai_color};"></div>
-            <div class="status-text" style="color: {st.session_state.cached_ai_color};">{st.session_state.cached_ai_status}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f'<div class="traffic-container"><div class="traffic-light" style="background-color: {st.session_state.cached_ai_color}; box-shadow: 0 0 80px {st.session_state.cached_ai_color};"></div><div class="status-text" style="color: {st.session_state.cached_ai_color};">{st.session_state.cached_ai_status}</div></div>', unsafe_allow_html=True)
 
     def color(val): return "#00FF00" if val >= 0 else "#FF4444"
     def fmt_item(label, key):
@@ -311,7 +271,7 @@ def main_dashboard_loop():
         for item in news_items:
             st.markdown(f'<div class="news-item"><a href="{item["link"]}" target="_blank">{item["title"]}</a></div>', unsafe_allow_html=True)
 
-    # Time & AI Logic
+    # Time Logic
     now = get_current_est_time()
     current_time_ts = time.time()
     is_weekday = now.weekday() <= 4
@@ -336,8 +296,5 @@ def main_dashboard_loop():
 # ==========================================
 # 🚦 ROUTER
 # ==========================================
-params = st.query_params
-if params.get("view") == "chart":
-    show_chart_page()
-else:
-    main_dashboard_loop()
+if st.query_params.get("view") == "chart": show_chart_page()
+else: main_dashboard_loop()
