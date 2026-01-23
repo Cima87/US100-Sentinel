@@ -3,3 +3,4 @@ yfinance
 feedparser
 google-generativeai
 pytz
+plotly
