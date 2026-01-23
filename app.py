@@ -7,6 +7,7 @@ import hashlib
 from datetime import datetime
 import pytz
 import plotly.graph_objects as go
+import urllib.parse
 
 # ==========================================
 # 🔑 CONFIGURATION
@@ -23,7 +24,7 @@ except:
 # 🧠 MEMORY
 # ==========================================
 if 'last_run' not in st.session_state: st.session_state.last_run = 0
-if 'cached_ai_summary' not in st.session_state: st.session_state.cached_ai_summary = "System Standby. Waiting for US Market Open..."
+if 'cached_ai_summary' not in st.session_state: st.session_state.cached_ai_summary = "System Initialized. Monitoring for fresh catalysts..."
 if 'cached_ai_color' not in st.session_state: st.session_state.cached_ai_color = "#333" 
 if 'cached_ai_status' not in st.session_state: st.session_state.cached_ai_status = "OFFLINE"
 if 'cached_breaking' not in st.session_state: st.session_state.cached_breaking = None
@@ -41,34 +42,22 @@ st.markdown("""
     .stApp { background-color: #000000; color: #FFFFFF; font-family: 'Montserrat', sans-serif; }
     header, footer {visibility: hidden;}
     
-    /* 1. REMOVE TOP SPACING */
     .block-container { padding-top: 1rem; padding-bottom: 2rem; }
 
-    /* 2. HEADER */
-    .vortex-title {
-        text-align: center; font-size: 38px; font-weight: 800; color: #FFFFFF;
-        margin-bottom: 0px; letter-spacing: -1px; line-height: 1;
-    }
-    .vortex-header {
-        text-align: center; font-size: 9px; letter-spacing: 3px; color: #666;
-        margin-top: 5px; margin-bottom: 20px; text-transform: uppercase; font-weight: 600;
-    }
+    .vortex-title { text-align: center; font-size: 38px; font-weight: 800; color: #FFFFFF; margin-bottom: 0px; letter-spacing: -1px; line-height: 1; }
+    .vortex-header { text-align: center; font-size: 9px; letter-spacing: 3px; color: #666; margin-top: 5px; margin-bottom: 20px; text-transform: uppercase; font-weight: 600; }
 
-    /* 3. COMPACT HERO (Smaller) */
     .hero-link { text-decoration: none; display: block; transition: transform 0.1s; }
     .hero-link:hover { transform: scale(1.02); }
     .hero-container {
         text-align: center; margin-bottom: 20px; padding: 6px 12px;
         background: radial-gradient(circle at center, #111 0%, #000 80%);
-        border: 1px solid #222; border-radius: 8px;
-        width: 180px; /* Narrower */
-        margin-left: auto; margin-right: auto;
+        border: 1px solid #222; border-radius: 8px; width: 180px; margin-left: auto; margin-right: auto;
     }
     .hero-label { font-size: 8px; color: #777; letter-spacing: 1px; margin-bottom: 1px; }
-    .hero-price { font-size: 20px; font-weight: 700; color: #FFF; line-height: 1; } /* Smaller font */
+    .hero-price { font-size: 20px; font-weight: 700; color: #FFF; line-height: 1; }
     .hero-change { font-size: 11px; font-weight: 600; margin-top: 2px; }
 
-    /* COMPONENTS */
     .traffic-container { display: flex; flex-direction: column; align-items: center; margin-bottom: 25px; }
     .traffic-light { width: 100px; height: 100px; border-radius: 50%; margin-bottom: 15px; border: 4px solid #111; transition: all 0.5s ease; }
     .status-text { font-size: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; }
@@ -80,15 +69,9 @@ st.markdown("""
     .g-price { font-size: 11px; font-weight: 600; color: #DDD; }
     .g-change { font-size: 10px; font-weight: 600; margin-bottom: 2px; }
 
-    /* NEWS FLASH BUTTON */
-    .stButton > button {
-        background-color: #222; color: #CCC; border: 1px solid #444; 
-        font-size: 10px; padding: 4px 10px; text-transform: uppercase;
-        margin-top: -5px; /* Align with header */
-    }
+    .stButton > button { background-color: #222; color: #CCC; border: 1px solid #444; font-size: 10px; padding: 4px 10px; text-transform: uppercase; margin-top: -5px; }
     .stButton > button:hover { border-color: #FFF; color: #FFF; background: #333; }
     
-    /* AI & NEWS */
     .ai-box { margin-bottom: 30px; padding: 15px; border-left: 4px solid #333; background: #080808; }
     .ai-text { font-size: 16px; color: #EEE; line-height: 1.6; font-weight: 400; }
     .breaking-box { background-color: #330000; border: 2px solid #FF0000; color: #FF4444; padding: 15px; text-align: center; font-size: 18px; font-weight: 800; margin-bottom: 30px; border-radius: 5px; text-transform: uppercase; animation: pulse 2s infinite; }
@@ -99,7 +82,6 @@ st.markdown("""
     .news-item a { color: #CCC; text-decoration: none; }
     .news-item a:hover { color: #4da6ff; }
     
-    /* CHART BACK BUTTON */
     .back-btn { font-size: 12px; color: #888; text-decoration: none; border: 1px solid #333; padding: 8px 15px; border-radius: 5px; background: #111; }
     </style>
 """, unsafe_allow_html=True)
@@ -112,14 +94,32 @@ def get_current_est_time():
     return datetime.now(tz)
 
 def get_latest_headlines():
-    rss_urls = ["https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=19854910", "https://www.investing.com/rss/news_25.rss"]
+    # 🚀 UPGRADED: Google News Aggregator (US100 Focus)
+    # This queries Google News for "Nasdaq OR Futures OR Economy" and filters for top finance sites.
+    # It acts like a Bloomberg Terminal Lite.
+    encoded_query = urllib.parse.quote("Nasdaq OR US Economy OR Federal Reserve when:1d")
+    google_news_url = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-US&gl=US&ceid=US:en"
+    
+    rss_urls = [
+        google_news_url, # The Heavy Lifter
+        "https://www.investing.com/rss/news_25.rss" # Specific Futures Data
+    ]
+    
     headlines = []
+    seen_titles = set()
+    
     for url in rss_urls:
         try:
             feed = feedparser.parse(url)
-            for entry in feed.entries[:6]: headlines.append({"title": entry.title, "link": entry.link})
+            for entry in feed.entries[:5]: # Take top 5 from each
+                # Deduplicate
+                if entry.title not in seen_titles:
+                    headlines.append({"title": entry.title, "link": entry.link})
+                    seen_titles.add(entry.title)
         except: pass
-    return headlines
+    
+    # Return top 8 most relevant
+    return headlines[:8]
 
 def get_financial_data():
     try:
@@ -143,17 +143,33 @@ def get_financial_data():
         return metrics
     except: return {}
 
-def run_gemini_analysis(headlines_text, is_end_of_day=False):
+def run_gemini_analysis(headlines_text, previous_summary, is_end_of_day=False):
     if not AI_AVAILABLE: return "#555", "API ERROR", "Key Missing", None
     try:
         if is_end_of_day:
             prompt = f"Act as a Senior Wall Street Analyst. Market Closed. Analyze these headlines: {headlines_text}. Task: 1. Daily Wrap-Up (Max 3 sentences). 2. End with 'Markets closed. AI is sleeping now.' 3. Color #333. Output: COLOR|SUMMARY|NONE"
         else:
+            # === 🛡️ MEMORY-ENHANCED PROMPT ===
             prompt = f"""
-            Act as a Senior NASDAQ Futures Trader. Analyze these headlines: {headlines_text}
-            Task 1: Determine Investment Climate (Traffic Light): GREEN=BULLISH, RED=BEARISH, ORANGE=NEUTRAL. *Do not mark Volatility as Red unless Downside.*
-            Task 2: Situation Report (Max 60 words): Identify biggest catalyst for NQ futures. Mention 2 other factors.
-            Task 3: Check BREAKING 3-STAR EVENTS. Output strictly: COLOR|SUMMARY|BREAKING_EVENT
+            Act as a Senior NASDAQ Futures Trader.
+            
+            1. PREVIOUS CONTEXT (What you said 30 mins ago):
+            "{previous_summary}"
+            
+            2. NEW HEADLINES (Right Now):
+            {headlines_text}
+            
+            TASK:
+            Update the situation report. Compare NEW headlines against PREVIOUS context.
+            - If new news contradicts old news (e.g. "Sales Stall" vs "Sales Cleared"), clarify the confusion.
+            - Weigh the 'Freshness': New headlines override old ones.
+            - Traffic Light: GREEN=Bullish, RED=Bearish, ORANGE=Mixed/Choppy.
+            
+            OUTPUT RULES:
+            - Summary (Max 60 words): Focus on the primary catalyst.
+            - Breaking Event: Only for Crashes/War/Fed. Else "NONE".
+            
+            Output strictly: COLOR|SUMMARY|BREAKING_EVENT
             """
         response = model.generate_content(prompt)
         text = response.text.strip()
@@ -204,20 +220,18 @@ def show_chart_page():
     except: st.error("Chart Error")
 
 # ==========================================
-# 🏠 VIEW 2: DASHBOARD (NO FLICKER)
+# 🏠 VIEW 2: DASHBOARD
 # ==========================================
 @st.fragment(run_every=60)
 def main_dashboard_loop():
-    # 1. Placeholders
     header_ph = st.empty()
     traffic_ph = st.empty()
     global_ph = st.empty()
     breaking_ph = st.empty()
-    ai_header_ph = st.empty() # For Header + Button
+    ai_header_ph = st.empty()
     ai_ph = st.empty()
     news_ph = st.empty()
     
-    # 2. Get Data
     data = get_financial_data()
     news_items = get_latest_headlines()
     
@@ -225,7 +239,6 @@ def main_dashboard_loop():
     hero_color = "#00FF00" if nq_c >= 0 else "#FF4444"
     hero_sign = "+" if nq_c >= 0 else ""
     
-    # 3. RENDER UI
     with header_ph.container():
         st.markdown('<div class="vortex-title">US100 VORTEX</div>', unsafe_allow_html=True)
         st.markdown('<div class="vortex-header">ALGORITHMIC NEWS FILTER</div>', unsafe_allow_html=True)
@@ -250,19 +263,16 @@ def main_dashboard_loop():
     with global_ph.container():
         st.markdown(f'<div class="global-grid">{fmt_item("🇪🇺 DAX", "DAX")}{fmt_item("🇬🇧 FTSE", "FTSE")}{fmt_item("🇯🇵 NIKKEI", "NI225")}{fmt_item("🇺🇸 DXY", "DXY")}</div>', unsafe_allow_html=True)
 
-    # --- BUTTON LOGIC ---
-    # Check if we should show the manual trigger
+    # BUTTON LOGIC
     show_flash_btn = st.session_state.cached_ai_status in ["OFFLINE", "STANDBY", "MARKET CLOSED"]
     manual_trigger = False
 
     with ai_header_ph.container():
         c1, c2 = st.columns([3, 1])
-        with c1:
-            st.markdown('<div class="label" style="margin-top:5px;">GEMINI SITUATION REPORT</div>', unsafe_allow_html=True)
+        with c1: st.markdown('<div class="label" style="margin-top:5px;">GEMINI SITUATION REPORT</div>', unsafe_allow_html=True)
         with c2:
             if show_flash_btn:
-                if st.button("⚡ NEWS FLASH"):
-                    manual_trigger = True
+                if st.button("⚡ NEWS FLASH"): manual_trigger = True
 
     with ai_ph.container():
         st.markdown(f'<div class="ai-box" style="border-left-color: {st.session_state.cached_ai_color};"><div class="ai-text">{st.session_state.cached_ai_summary}</div></div>', unsafe_allow_html=True)
@@ -275,44 +285,54 @@ def main_dashboard_loop():
         for item in news_items:
             st.markdown(f'<div class="news-item"><a href="{item["link"]}" target="_blank">{item["title"]}</a></div>', unsafe_allow_html=True)
 
-    # 4. EXECUTION LOGIC (NO FLICKER)
-    # Check Time
+    # EXECUTION
     now = get_current_est_time()
     current_time_ts = time.time()
     is_weekday = now.weekday() <= 4
     is_trading_hours = 9 <= now.hour < 18
     is_closing_time = now.hour == 18
     
-    # Auto triggers
     should_run_standard = is_weekday and is_trading_hours and ((current_time_ts - st.session_state.last_run) > 1800)
     last_run_hour = datetime.fromtimestamp(st.session_state.last_run, pytz.timezone('US/Eastern')).hour
     should_run_closing = is_weekday and is_closing_time and (last_run_hour < 18)
     should_run_fresh = (st.session_state.last_run == 0) and (is_trading_hours or is_closing_time)
 
-    # Run if Auto Condition OR Manual Button Clicked
-    if should_run_standard or should_run_closing or should_run_fresh or manual_trigger:
+    if manual_trigger:
+        with st.status("🚨 ACTIVATING VORTEX PROTOCOL...", expanded=True) as status:
+            st.write("📡 Scanning Global Feeds (Google News/CNBC)...")
+            news_text = str([h['title'] for h in news_items])
+            time.sleep(0.5)
+            st.write("🧠 Gemini 3: Comparing with previous context...")
+            
+            is_eod_run = should_run_closing or (is_closing_time and should_run_fresh)
+            # PASS THE PREVIOUS SUMMARY HERE
+            color, status_txt, summary, breaking = run_gemini_analysis(news_text, st.session_state.cached_ai_summary, is_end_of_day=is_eod_run)
+            
+            st.session_state.cached_ai_color = color
+            st.session_state.cached_ai_status = status_txt
+            st.session_state.cached_ai_summary = summary
+            st.session_state.cached_breaking = breaking
+            st.session_state.last_run = current_time_ts
+            
+            status.update(label="✅ ANALYSIS COMPLETE", state="complete", expanded=False)
+            time.sleep(1)
+            st.rerun()
+
+    elif should_run_standard or should_run_closing or should_run_fresh:
         news_text = str([h['title'] for h in news_items])
         is_eod_run = should_run_closing or (is_closing_time and should_run_fresh)
+        color, status_txt, summary, breaking = run_gemini_analysis(news_text, st.session_state.cached_ai_summary, is_end_of_day=is_eod_run)
         
-        # Run AI
-        color, status, summary, breaking = run_gemini_analysis(news_text, is_end_of_day=is_eod_run)
-        
-        # Update Session State
         st.session_state.cached_ai_color = color
-        st.session_state.cached_ai_status = status
+        st.session_state.cached_ai_status = status_txt
         st.session_state.cached_ai_summary = summary
         st.session_state.cached_breaking = breaking
         st.session_state.last_run = current_time_ts
         
-        # Force Immediate UI Update (Overwrite Placeholders) without Page Reload
         with traffic_ph.container():
-            st.markdown(f'<div class="traffic-container"><div class="traffic-light" style="background-color: {color}; box-shadow: 0 0 80px {color};"></div><div class="status-text" style="color: {color};">{status}</div></div>', unsafe_allow_html=True)
-        
+             st.markdown(f'<div class="traffic-container"><div class="traffic-light" style="background-color: {color}; box-shadow: 0 0 80px {color};"></div><div class="status-text" style="color: {color};">{status_txt}</div></div>', unsafe_allow_html=True)
         with ai_ph.container():
              st.markdown(f'<div class="ai-box" style="border-left-color: {color};"><div class="ai-text">{summary}</div></div>', unsafe_allow_html=True)
-
-        # Note: We do NOT call st.rerun() here. This prevents the flicker. 
-        # The placeholders update instantly, and the fragment will naturally cycle again in 60s.
 
 # ==========================================
 # 🚦 ROUTER
