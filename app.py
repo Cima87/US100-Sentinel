@@ -26,8 +26,6 @@ if 'cached_ai_summary' not in st.session_state: st.session_state.cached_ai_summa
 if 'cached_ai_color' not in st.session_state: st.session_state.cached_ai_color = "#333" 
 if 'cached_ai_status' not in st.session_state: st.session_state.cached_ai_status = "STANDBY"
 if 'cached_breaking' not in st.session_state: st.session_state.cached_breaking = None
-# Default currency selection
-if 'selected_currency' not in st.session_state: st.session_state.selected_currency = "SEK"
 
 # ==========================================
 # 🎨 STATIC CSS
@@ -46,28 +44,28 @@ st.markdown("""
     .traffic-light { width: 90px; height: 90px; border-radius: 50%; margin-bottom: 15px; transition: background-color 0.5s ease; }
     .status-text { font-size: 24px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; }
     
-    /* GLOBAL MARKETS GRID */
+    /* COMPACT GLOBAL GRID */
     .global-grid { 
         display: grid; 
         grid-template-columns: repeat(5, 1fr); 
-        gap: 5px; 
-        margin-bottom: 20px; 
-        background: #111;
-        padding: 10px;
+        gap: 4px; 
+        margin-bottom: 25px; 
+        background: #080808;
+        padding: 8px;
         border-radius: 8px;
-        border: 1px solid #333;
+        border: 1px solid #222;
     }
-    .global-item { text-align: center; }
-    .global-name { font-size: 9px; color: #888; margin-bottom: 2px; }
-    .global-val { font-size: 12px; font-weight: 600; }
+    .global-item { 
+        text-align: center; 
+        padding: 5px 0;
+        border-right: 1px solid #222;
+    }
+    .global-item:last-child { border-right: none; }
     
-    /* CONVERTER BOX */
-    .converter-box { 
-        background-color: #111; border: 1px solid #333; border-radius: 8px; 
-        padding: 15px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;
-    }
-    .conv-label { font-size: 11px; color: #888; letter-spacing: 1px; }
-    .conv-value { font-size: 20px; font-weight: 600; color: #FFF; }
+    .g-flag { font-size: 10px; color: #666; margin-bottom: 4px; font-weight: 800; }
+    .g-price { font-size: 11px; font-weight: 600; color: #DDD; }
+    .g-change { font-size: 10px; font-weight: 600; margin-bottom: 4px; }
+    .g-curr { font-size: 9px; color: #AAA; border-top: 1px solid #222; padding-top: 4px; margin-top: 4px; }
 
     /* AI & NEWS */
     .ai-box { margin-bottom: 30px; padding: 15px; border-left: 4px solid #333; background: #080808; }
@@ -94,45 +92,53 @@ st.markdown("""
 
 def get_financial_data():
     try:
-        # 1. INDICES (The "Stock Markets")
-        # NQ=F (US Tech), ^GDAXI (Germany/Euro), ^FTSE (UK), ^N225 (Japan), ^OMX (Sweden)
-        # 2. CURRENCIES (vs USD)
-        # EURUSD=X, GBPUSD=X, JPY=X (USD/JPY), SEK=X (USD/SEK)
+        # INDICES: Nasdaq, DAX, FTSE, Nikkei, OMX30
+        # CURRENCIES: DXY (Dollar Index), EUR, GBP, JPY, SEK
+        symbols = "NQ=F ^GDAXI ^FTSE ^N225 ^OMX DX-Y.NYB EURUSD=X GBPUSD=X JPY=X SEK=X"
+        tickers = yf.Tickers(symbols)
+        data = tickers.history(period="2d") # Get 2 days to calculate change if needed
         
-        tickers = yf.Tickers("NQ=F ^GDAXI ^FTSE ^N225 ^OMX EURUSD=X GBPUSD=X JPY=X SEK=X")
-        data = tickers.history(period="1d") # Get mostly recent close
-        
-        def get_change(symbol):
-            if symbol not in data['Close'].columns: return 0.0
-            closes = data['Close'][symbol].dropna()
-            opens = data['Open'][symbol].dropna()
-            if closes.empty: return 0.0
-            # Simple % change calculation (Today's movement)
-            return ((closes.iloc[-1] - opens.iloc[-1]) / opens.iloc[-1]) * 100
+        def get_metrics(symbol):
+            if symbol not in data['Close'].columns: return 0, 0
+            # Get latest price
+            price = data['Close'][symbol].dropna().iloc[-1]
+            
+            # Get change (Close - Open of same day to show daily momentum)
+            # OR (Close - Prev Close) which is standard. Let's use Close - Open for "Intraday" feel
+            open_price = data['Open'][symbol].dropna().iloc[-1]
+            change_pct = ((price - open_price) / open_price) * 100
+            return price, change_pct
 
-        def get_price(symbol):
-            if symbol not in data['Close'].columns: return 0.0
-            closes = data['Close'][symbol].dropna()
-            return closes.iloc[-1] if not closes.empty else 0.0
+        # Build Data Dict
+        metrics = {}
+        # US: Nasdaq + DXY
+        p, c = get_metrics("NQ=F")
+        cur_p, _ = get_metrics("DX-Y.NYB")
+        metrics['US'] = {'p': p, 'c': c, 'curr': f"DXY {cur_p:.1f}"}
+        
+        # EU: DAX + EUR
+        p, c = get_metrics("^GDAXI")
+        cur_p, _ = get_metrics("EURUSD=X")
+        metrics['EU'] = {'p': p, 'c': c, 'curr': f"${cur_p:.3f}"}
+        
+        # UK: FTSE + GBP
+        p, c = get_metrics("^FTSE")
+        cur_p, _ = get_metrics("GBPUSD=X")
+        metrics['UK'] = {'p': p, 'c': c, 'curr': f"${cur_p:.3f}"}
+        
+        # JP: Nikkei + JPY
+        p, c = get_metrics("^N225")
+        cur_p, _ = get_metrics("JPY=X")
+        metrics['JP'] = {'p': p, 'c': c, 'curr': f"¥{cur_p:.1f}"}
+        
+        # SE: OMX + SEK
+        p, c = get_metrics("^OMX")
+        cur_p, _ = get_metrics("SEK=X")
+        metrics['SE'] = {'p': p, 'c': c, 'curr': f"{cur_p:.2f} kr"}
 
-        market_performance = {
-            "US": get_change("NQ=F"),
-            "EU": get_change("^GDAXI"),
-            "UK": get_change("^FTSE"),
-            "JP": get_change("^N225"),
-            "SE": get_change("^OMX")
-        }
-        
-        currency_rates = {
-            "EUR": get_price("EURUSD=X"),  # 1 EUR = X USD
-            "GBP": get_price("GBPUSD=X"),  # 1 GBP = X USD
-            "JPY": get_price("JPY=X"),     # 1 USD = X JPY (Needs inversion for consistency usually, but we keep raw)
-            "SEK": get_price("SEK=X")      # 1 USD = X SEK
-        }
-        
-        return market_performance, currency_rates
+        return metrics
     except:
-        return {}, {}
+        return {}
 
 def get_latest_headlines():
     rss_urls = ["https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=19854910", "https://www.investing.com/rss/news_25.rss"]
@@ -182,7 +188,6 @@ def main_dashboard_loop():
     # 1. SETUP PLACEHOLDERS
     traffic_ph = st.empty()
     global_ph = st.empty()
-    converter_ph = st.empty()
     breaking_ph = st.empty()
     ai_ph = st.empty()
     news_ph = st.empty()
@@ -206,57 +211,40 @@ def main_dashboard_loop():
         breaking_ph.markdown('<div style="height: 10px;"></div>', unsafe_allow_html=True)
 
     # 3. GET FRESH DATA
-    markets, rates = get_financial_data()
+    data = get_financial_data()
     news_items = get_latest_headlines()
     
-    # 4. RENDER GLOBAL MARKETS (THE NEW GRID)
+    # 4. RENDER GLOBAL PULSE (Consolidated Grid)
     def color(val): return "#00FF00" if val >= 0 else "#FF4444"
+    def fmt_item(flag, key):
+        item = data.get(key, {'p':0, 'c':0, 'curr':'-'})
+        return f"""
+        <div class="global-item">
+            <div class="g-flag">{flag}</div>
+            <div class="g-price">{item['p']:,.0f}</div>
+            <div class="g-change" style="color:{color(item['c'])}">{item['c']:+.1f}%</div>
+            <div class="g-curr">{item['curr']}</div>
+        </div>
+        """
     
     with global_ph.container():
-        st.markdown('<div class="label" style="text-align:center;">GLOBAL PULSE (INDICES)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="label" style="text-align:center;">GLOBAL SENTINEL</div>', unsafe_allow_html=True)
         st.markdown(f"""
         <div class="global-grid">
-            <div class="global-item"><div class="global-name">🇺🇸 US</div><div class="global-val" style="color:{color(markets.get('US',0))}">{markets.get('US',0):+.1f}%</div></div>
-            <div class="global-item"><div class="global-name">🇪🇺 EU</div><div class="global-val" style="color:{color(markets.get('EU',0))}">{markets.get('EU',0):+.1f}%</div></div>
-            <div class="global-item"><div class="global-name">🇬🇧 UK</div><div class="global-val" style="color:{color(markets.get('UK',0))}">{markets.get('UK',0):+.1f}%</div></div>
-            <div class="global-item"><div class="global-name">🇯🇵 JP</div><div class="global-val" style="color:{color(markets.get('JP',0))}">{markets.get('JP',0):+.1f}%</div></div>
-            <div class="global-item"><div class="global-name">🇸🇪 SE</div><div class="global-val" style="color:{color(markets.get('SE',0))}">{markets.get('SE',0):+.1f}%</div></div>
+            {fmt_item("🇺🇸 US", "US")}
+            {fmt_item("🇪🇺 EU", "EU")}
+            {fmt_item("🇬🇧 UK", "UK")}
+            {fmt_item("🇯🇵 JP", "JP")}
+            {fmt_item("🇸🇪 SE", "SE")}
         </div>
         """, unsafe_allow_html=True)
-
-    # 5. RENDER CURRENCY CONVERTER (INTERACTIVE)
-    with converter_ph.container():
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            # Dropdown menu
-            curr = st.selectbox("VS DOLLAR", ["SEK", "EUR", "GBP", "JPY"], key="currency_selector")
-        with col2:
-            # Logic to display rate
-            if curr == "SEK": 
-                val = rates.get("SEK", 0)
-                display = f"1 $ = {val:.2f} kr"
-            elif curr == "JPY": 
-                val = rates.get("JPY", 0)
-                display = f"1 $ = {val:.2f} ¥"
-            elif curr == "EUR": 
-                val = rates.get("EUR", 0)
-                display = f"1 € = {val:.3f} $" # EUR/GBP are usually inverted (1 Euro = X Dollar)
-            elif curr == "GBP": 
-                val = rates.get("GBP", 0)
-                display = f"1 £ = {val:.3f} $"
-
-            st.markdown(f"""
-            <div style="text-align: right; padding-top: 10px;">
-                <div class="conv-value">{display}</div>
-            </div>
-            """, unsafe_allow_html=True)
 
     with news_ph.container():
         st.markdown('<div class="news-header">LIVE WIRE (UPDATED)</div>', unsafe_allow_html=True)
         for item in news_items:
             st.markdown(f'<div class="news-item"><a href="{item["link"]}" target="_blank">{item["title"]}</a></div>', unsafe_allow_html=True)
 
-    # 6. TIME & AI LOGIC
+    # 5. TIME & AI LOGIC
     now = get_current_est_time()
     current_time_ts = time.time()
     is_weekday = now.weekday() <= 4
@@ -278,6 +266,6 @@ def main_dashboard_loop():
         st.session_state.cached_ai_summary = summary
         st.session_state.cached_breaking = breaking
         st.session_state.last_run = current_time_ts
-        st.rerun() # Force redraw to update AI box instantly
+        st.rerun() 
 
 main_dashboard_loop()
