@@ -167,7 +167,7 @@ def run_gemini_analysis(headlines_text, previous_summary, is_end_of_day=False):
             - Traffic Light: GREEN=Bullish, RED=Bearish, ORANGE=Mixed/Choppy.
             
             OUTPUT RULES:
-            - Summary (Max 100 words): Focus on the primary catalyst.
+            - Summary (Max 200 words): Focus on the primary catalyst and factors that have an influence on the US100 futures. Explain context of US100 futures developments and use simple economic/financial terms. Use the vocabulary of an average english native.
             - Breaking Event: Only for Crashes/War/Fed. Else "NONE".
             
             Output strictly: COLOR|SUMMARY|BREAKING_EVENT
